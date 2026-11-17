@@ -1,0 +1,6 @@
+{
+ "name":"DaftarNesieh Android",
+ "build":{"dockerfile":"Dockerfile"},
+ "remoteUser":"vscode",
+ "postCreateCommand":"gradle --no-daemon :app:assembleDebug"
+}
