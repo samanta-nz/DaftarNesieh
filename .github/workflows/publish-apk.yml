@@ -1,0 +1,47 @@
+name: Publish v1.1 APK to GitHub
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-apk.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Download exact successful v1.1 build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p downloaded downloads
+          gh run download 44123472050 --repo "${{ github.repository }}" --name DaftarNesieh-debug-APK --dir downloaded
+          test -s downloaded/app-debug.apk
+          cp downloaded/app-debug.apk downloads/DaftarNesieh-v1.1-debug.apk
+          file downloads/DaftarNesieh-v1.1-debug.apk
+          sha256sum downloads/DaftarNesieh-v1.1-debug.apk
+      - name: Commit APK to main for a permanent raw link
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f downloads/DaftarNesieh-v1.1-debug.apk
+          git diff --cached --quiet || git commit -m "Publish compiled DaftarNesieh v1.1 debug APK [skip ci]"
+          git push origin HEAD:main
+      - name: Create GitHub release with directly downloadable APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.1.0 --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload v1.1.0 downloads/DaftarNesieh-v1.1-debug.apk --clobber --repo "${{ github.repository }}"
+          else
+            gh release create v1.1.0 downloads/DaftarNesieh-v1.1-debug.apk \
+              --repo "${{ github.repository }}" \
+              --target main \
+              --title "DaftarNesieh 1.1.0 (Android Debug APK)" \
+              --notes "Persian supermarket credit ledger. Live thousands grouping, number-to-Persian-words, editable transaction date/time, adjustable font size, customer notes and backup support. This is a debug-signed build."
+          fi
