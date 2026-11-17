@@ -27,7 +27,6 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.icu.util.Calendar;
-import android.icu.util.PersianCalendar;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -402,7 +401,7 @@ public final class MainActivity extends Activity {
     });
   }
   private void selectDay(String label,long date,Consumer<Long> done){
-    PersianCalendar cal=Shamsi.calendar();cal.setTimeInMillis(date);
+    Calendar cal=Shamsi.calendar();cal.setTimeInMillis(date);
     LinearLayout wrap=horizontal();wrap.setPadding(d(12),d(10),d(12),0);
     NumberPicker year=new NumberPicker(this),month=new NumberPicker(this),day=new NumberPicker(this);
     year.setMinValue(1300);year.setMaxValue(1500);year.setValue(cal.get(Calendar.YEAR));
@@ -411,7 +410,7 @@ public final class MainActivity extends Activity {
     for(NumberPicker p:new NumberPicker[]{day,month,year})
       wrap.addView(p,new LinearLayout.LayoutParams(0,d(160),1));
     Runnable clamp=()->{
-      PersianCalendar c=Shamsi.calendar();c.clear();
+      Calendar c=Shamsi.calendar();c.clear();
       c.set(Calendar.YEAR,year.getValue());c.set(Calendar.MONTH,month.getValue()-1);c.set(Calendar.DAY_OF_MONTH,1);
       int max=c.getActualMaximum(Calendar.DAY_OF_MONTH);
       if(day.getValue()>max)day.setValue(max);
