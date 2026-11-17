@@ -2,6 +2,7 @@ package ir.daftarnesieh.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.TimePickerDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -24,6 +25,7 @@ import android.widget.NumberPicker;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.icu.util.Calendar;
@@ -66,6 +68,8 @@ public final class MainActivity extends Activity {
     else super.onBackPressed();
   }
   private int d(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
+  private int fontStep(){return Math.max(0,Math.min(10,prefs.getInt("fontStep",0)));}
+  private int fs(int base){return base+fontStep();}
   private void palette(){
     int n=getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
     dark=n==Configuration.UI_MODE_NIGHT_YES;
@@ -99,7 +103,7 @@ public final class MainActivity extends Activity {
   }
   private void gap(LinearLayout parent,int h){parent.addView(new View(this),lp(1,h));}
   private TextView text(String s,int size,boolean bold,int color){
-    TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);
+    TextView t=new TextView(this);t.setText(s);t.setTextSize(fs(size));t.setTextColor(color);
     t.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);
     t.setTextDirection(View.TEXT_DIRECTION_FIRST_STRONG);
     t.setTypeface(Typeface.create("sans-serif",bold?Typeface.BOLD:Typeface.NORMAL));return t;
@@ -115,8 +119,8 @@ public final class MainActivity extends Activity {
     LinearLayout.LayoutParams p=lp(-1,-2);p.bottomMargin=d(bottom);parent.addView(v,p);
   }
   private Button button(String label,boolean filled,Runnable run){
-    Button b=new Button(this);b.setAllCaps(false);b.setText(label);b.setTextSize(14);
-    b.setMinHeight(d(48));b.setPadding(d(12),0,d(12),0);
+    Button b=new Button(this);b.setAllCaps(false);b.setText(label);b.setTextSize(fs(14));
+    b.setMinHeight(d(48+fontStep()));b.setPadding(d(12),0,d(12),0);
     b.setTextColor(filled?Color.WHITE:accent);
     b.setBackground(filled?rounded(accent,16):outlined(surface,16));
     b.setOnClickListener(v->run.run());return b;
@@ -131,10 +135,10 @@ public final class MainActivity extends Activity {
   }
   private LinearLayout field(String name,String hint,int type){
     LinearLayout f=vertical();f.addView(text(name,13,true,muted));gap(f,5);
-    EditText e=new EditText(this);e.setSingleLine(true);e.setTextSize(16);
+    EditText e=new EditText(this);e.setSingleLine(true);e.setTextSize(fs(16));
     e.setHint(hint);e.setHintTextColor(muted);e.setTextColor(fg);e.setInputType(type);
     e.setPadding(d(12),d(9),d(12),d(9));e.setBackground(outlined(surface2,12));
-    f.addView(e,lp(-1,49));return f;
+    f.addView(e,lp(-1,49+fontStep()));return f;
   }
   private EditText edit(LinearLayout f){return (EditText)f.getChildAt(2);}
   private void draw(){
@@ -159,7 +163,7 @@ public final class MainActivity extends Activity {
     for(int i=0;i<pages.length;i++){
       final int target=pages[i];
       Button b=button(titles[i],page==target,()->{page=target;draw();});
-      b.setTextSize(12);
+      b.setTextSize(fs(12));
       LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,d(47),1);
       p.setMargins(d(3),0,d(3),0);bar.addView(b,p);
     }
@@ -200,7 +204,7 @@ public final class MainActivity extends Activity {
       final int v=periods[i];Button b=button(names[i],customFrom==null&&period==v,()->{
         period=v;clearCustom();draw();
       });
-      b.setTextSize(12);LinearLayout.LayoutParams p=lp(-2,39);
+      b.setTextSize(fs(12));LinearLayout.LayoutParams p=lp(-2,39+fontStep());
       p.leftMargin=d(5);options.addView(b,p);
     }
     android.widget.HorizontalScrollView sc=new android.widget.HorizontalScrollView(this);
@@ -210,7 +214,8 @@ public final class MainActivity extends Activity {
   }
   private LinearLayout statCard(String label,long value,int color){
     LinearLayout c=card();c.addView(text(label,12,true,muted));gap(c,8);
-    c.addView(text(Money.format(value),16,true,color));return c;
+    c.addView(text(Money.format(value),16,true,color));gap(c,5);
+    c.addView(text(Money.inWords(value),11,false,muted));return c;
   }
   private void statPair(LinearLayout parent,LinearLayout a,LinearLayout b){
     LinearLayout row=horizontal();
@@ -243,13 +248,13 @@ public final class MainActivity extends Activity {
     Collections.sort(clients,(x,y)->Long.compare(y.balance,x.balance));
     int count=0;
     for(Store.Customer c:clients){
-      if(c.balance>0&&count++<6)clickRow(body,c.name(),Money.balance(c.balance),()->openCustomer(c.id));
+      if(c.balance>0&&count++<6)clickRow(body,c.name(),Money.balanceFull(c.balance),()->openCustomer(c.id));
     }
     if(count==0)body.addView(text("هنوز بدهی ثبت نشده است.",14,false,muted));
   }
   private void customerList(){
     title("مشتریان");action(body,"＋ مشتری جدید",true,()->customerForm(this::openCustomer));
-    EditText search=new EditText(this);search.setSingleLine(true);search.setTextSize(15);
+    EditText search=new EditText(this);search.setSingleLine(true);search.setTextSize(fs(15));
     search.setHint("جستجو با نام یا شماره تماس");search.setTextColor(fg);search.setHintTextColor(muted);
     search.setPadding(d(15),d(10),d(15),d(10));search.setBackground(outlined(surface,16));
     place(body,search,13);
@@ -264,7 +269,7 @@ public final class MainActivity extends Activity {
   private void renderCustomers(LinearLayout output,String query){
     output.removeAllViews();List<Store.Customer> clients=store.customers(query);
     if(clients.isEmpty()){output.addView(text("مشتری‌ای یافت نشد.",14,false,muted));return;}
-    for(Store.Customer c:clients)clickRow(output,c.name(),c.phone+" • "+Money.balance(c.balance),()->openCustomer(c.id));
+    for(Store.Customer c:clients)clickRow(output,c.name(),c.phone+" • "+Money.balanceFull(c.balance)+(c.notes.isEmpty()?"":"\n"+c.notes),()->openCustomer(c.id));
   }
   private void openCustomer(long id){customerId=id;page=DETAIL;clearCustom();draw();}
   private void detail(){
@@ -273,8 +278,11 @@ public final class MainActivity extends Activity {
     TextView back=text("‹ بازگشت به مشتریان",13,true,accent);
     back.setOnClickListener(v->{page=CUSTOMERS;draw();});place(body,back,12);
     LinearLayout head=card();head.addView(text(c.name(),25,true,fg));
-    gap(head,5);head.addView(text(c.phone,15,false,muted));gap(head,9);
+    gap(head,5);head.addView(text(c.phone,15,false,muted));
+    if(c.notes!=null&&!c.notes.isEmpty()){gap(head,7);head.addView(text("توضیحات: "+c.notes,13,false,muted));}
+    gap(head,9);
     head.addView(text(Money.balance(c.balance),19,true,c.balance>0?positive:(c.balance<0?negative:accent)));
+    gap(head,4);head.addView(text(Money.inWords(Math.abs(c.balance)),13,false,muted));
     place(body,head,15);
     LinearLayout row=horizontal();
     Button debt=button("＋ نسیه",true,()->entryForm(c,LedgerLogic.DEBT));
@@ -287,10 +295,10 @@ public final class MainActivity extends Activity {
     title("گردش حساب");filters(body,true);
     Store.Statement s=store.statement(c.id,from(),until());
     LinearLayout card=card();
-    card.addView(text("مانده قبلی: "+Money.balance(s.report.opening),13,true,fg));gap(card,8);
-    card.addView(text("نسیه دوره: "+Money.format(s.report.debt),13,false,muted));gap(card,6);
-    card.addView(text("پرداخت دوره: "+Money.format(s.report.receipts),13,false,muted));gap(card,8);
-    card.addView(text("مانده پایان: "+Money.balance(s.report.closing),14,true,accent));
+    card.addView(text("مانده قبلی: "+Money.balanceFull(s.report.opening),13,true,fg));gap(card,8);
+    card.addView(text("نسیه دوره: "+Money.full(s.report.debt),13,false,muted));gap(card,6);
+    card.addView(text("پرداخت دوره: "+Money.full(s.report.receipts),13,false,muted));gap(card,8);
+    card.addView(text("مانده پایان: "+Money.balanceFull(s.report.closing),14,true,accent));
     place(body,card,13);
     if(s.movements.isEmpty()){body.addView(text("تراکنشی در بازه نیست.",13,false,muted));return;}
     List<Store.Movement> reverse=new ArrayList<>(s.movements);Collections.reverse(reverse);
@@ -300,7 +308,9 @@ public final class MainActivity extends Activity {
       LinearLayout sub=horizontal();
       sub.addView(text(Shamsi.dateTime(e.timestamp),12,false,muted),new LinearLayout.LayoutParams(0,-2,1));
       sub.addView(text((isDebt?"＋ ":"− ")+Money.format(e.amount),13,true,isDebt?positive:negative));
-      c2.addView(sub);place(body,c2,8);
+      c2.addView(sub);gap(c2,4);
+      c2.addView(text(Money.inWords(e.amount),12,false,muted));
+      place(body,c2,8);
     }
   }
   private void customerForm(Consumer<Long> next){
@@ -308,13 +318,16 @@ public final class MainActivity extends Activity {
     LinearLayout first=field("نام","نام",InputType.TYPE_CLASS_TEXT);
     LinearLayout last=field("نام خانوادگی","نام خانوادگی",InputType.TYPE_CLASS_TEXT);
     LinearLayout phone=field("شماره تماس","۰۹۱۲...",InputType.TYPE_CLASS_PHONE);
-    f.addView(first);gap(f,12);f.addView(last);gap(f,12);f.addView(phone);
+    LinearLayout notes=field("توضیحات مشتری (اختیاری)","آدرس، توضیحات یا نکات مربوط به مشتری",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+    EditText notesText=edit(notes);notesText.setSingleLine(false);notesText.setMinLines(3);
+    notesText.setLayoutParams(lp(-1,95+fontStep()*3));
+    f.addView(first);gap(f,12);f.addView(last);gap(f,12);f.addView(phone);gap(f,12);f.addView(notes);
     AlertDialog dialog=new AlertDialog.Builder(this).setTitle("مشتری جدید")
       .setView(f).setNegativeButton("انصراف",null).setPositiveButton("ذخیره",null).create();
     dialog.setOnShowListener(v->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(w->{
       try{
         long id=store.addCustomer(edit(first).getText().toString(),edit(last).getText().toString(),
-          edit(phone).getText().toString());
+          edit(phone).getText().toString(),edit(notes).getText().toString());
         dialog.dismiss();next.accept(id);
       }catch(Exception e){notice(e.getMessage());}
     }));
@@ -336,20 +349,74 @@ public final class MainActivity extends Activity {
     form.addView(text("مشتری: "+customer.name(),14,true,accent));gap(form,9);
     LinearLayout items=field("اجناس","مثلاً برنج، شیر، نان",InputType.TYPE_CLASS_TEXT);
     if(debt){form.addView(items);gap(form,11);}
-    LinearLayout amount=field("مبلغ (تومان)","مثلاً ۲۵۰۰۰۰",InputType.TYPE_CLASS_NUMBER);
+    LinearLayout amount=field("مبلغ (تومان)","مثلاً ۲۵۰٬۰۰۰",InputType.TYPE_CLASS_NUMBER);
     form.addView(amount);
+    gap(form,5);
+    TextView wordsPreview=text("مبلغ را وارد کنید تا به حروف نمایش داده شود.",13,false,accent);
+    form.addView(wordsPreview);
+    EditText amountInput=edit(amount);
+    amountInput.addTextChangedListener(new TextWatcher(){
+      boolean formatting=false;
+      public void beforeTextChanged(CharSequence s,int start,int count,int after){}
+      public void onTextChanged(CharSequence s,int start,int before,int count){}
+      public void afterTextChanged(Editable editable){
+        if(formatting)return;
+        String raw=editable.toString();
+        int caret=Math.max(0,amountInput.getSelectionStart()),digitsBefore=0;
+        for(int i=0;i<Math.min(caret,raw.length());i++)
+          if(Character.digit(raw.charAt(i),10)>=0)digitsBefore++;
+        String grouped=Money.groupDigits(raw);
+        if(!grouped.equals(raw)){
+          formatting=true;amountInput.setText(grouped);
+          int pos=0,passed=0;
+          while(pos<grouped.length()&&passed<digitsBefore){
+            if(Character.digit(grouped.charAt(pos),10)>=0)passed++;
+            pos++;
+          }
+          amountInput.setSelection(Math.min(pos,grouped.length()));
+          formatting=false;
+        }
+        if(grouped.isEmpty()){wordsPreview.setText("مبلغ را وارد کنید.");return;}
+        try{
+          if(grouped.equals("۰"))wordsPreview.setText("به حروف: صفر تومان");
+          else wordsPreview.setText("به حروف: "+Money.inWords(Money.parse(grouped)));
+        }catch(Exception e){wordsPreview.setText("مبلغ نامعتبر یا خارج از محدوده است.");}
+      }
+    });
     RadioGroup methods=new RadioGroup(this);methods.setOrientation(LinearLayout.VERTICAL);
     methods.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
     String[] paymentMethods={"نقدی","کارتخوان","کارت‌به‌کارت"};
     if(!debt){
       gap(form,12);form.addView(text("روش دریافت وجه",13,true,muted));
       for(int i=0;i<paymentMethods.length;i++){
-        RadioButton rb=new RadioButton(this);rb.setText(paymentMethods[i]);rb.setTextColor(fg);
+        RadioButton rb=new RadioButton(this);rb.setText(paymentMethods[i]);rb.setTextColor(fg);rb.setTextSize(fs(14));
         rb.setId(1000+i);methods.addView(rb);if(i==0)rb.setChecked(true);
       }
       form.addView(methods);
     }
-    gap(form,7);form.addView(text("ثبت با تاریخ: "+Shamsi.dateTime(System.currentTimeMillis()),12,false,muted));
+    gap(form,12);
+    final long[] selectedTime={System.currentTimeMillis()};
+    final TextView dateLabel=text("تاریخ و ساعت ثبت: "+Shamsi.dateTime(selectedTime[0]),13,true,accent);
+    form.addView(dateLabel);gap(form,6);
+    action(form,"📅 تغییر تاریخ شمسی",false,()->selectDay("تاریخ تراکنش",selectedTime[0],start->{
+      Calendar previous=Shamsi.calendar();previous.setTimeInMillis(selectedTime[0]);
+      Calendar updated=Shamsi.calendar();updated.setTimeInMillis(start);
+      updated.set(Calendar.HOUR_OF_DAY,previous.get(Calendar.HOUR_OF_DAY));
+      updated.set(Calendar.MINUTE,previous.get(Calendar.MINUTE));
+      updated.set(Calendar.SECOND,previous.get(Calendar.SECOND));
+      selectedTime[0]=updated.getTimeInMillis();
+      dateLabel.setText("تاریخ و ساعت ثبت: "+Shamsi.dateTime(selectedTime[0]));
+    }));
+    action(form,"◷ تغییر ساعت",false,()->{
+      Calendar cal=Shamsi.calendar();cal.setTimeInMillis(selectedTime[0]);
+      new TimePickerDialog(this,(view,hour,minute)->{
+        Calendar changed=Shamsi.calendar();changed.setTimeInMillis(selectedTime[0]);
+        changed.set(Calendar.HOUR_OF_DAY,hour);changed.set(Calendar.MINUTE,minute);
+        changed.set(Calendar.SECOND,0);changed.set(Calendar.MILLISECOND,0);
+        selectedTime[0]=changed.getTimeInMillis();
+        dateLabel.setText("تاریخ و ساعت ثبت: "+Shamsi.dateTime(selectedTime[0]));
+      },cal.get(Calendar.HOUR_OF_DAY),cal.get(Calendar.MINUTE),true).show();
+    });
     AlertDialog dialog=new AlertDialog.Builder(this)
       .setTitle(debt?"ثبت نسیه":"ثبت دریافت وجه").setView(form)
       .setNegativeButton("انصراف",null).setPositiveButton("ثبت تراکنش",null).create();
@@ -357,7 +424,7 @@ public final class MainActivity extends Activity {
       try{
         long n=Money.parse(edit(amount).getText().toString());
         String method=debt?"":paymentMethods[methods.getCheckedRadioButtonId()-1000];
-        store.addMovement(customer.id,kind,debt?edit(items).getText().toString():"",method,n);
+        store.addMovement(customer.id,kind,debt?edit(items).getText().toString():"",method,n,selectedTime[0]);
         dialog.dismiss();customerId=customer.id;page=DETAIL;draw();notice("تراکنش ثبت شد");
       }catch(Exception e){notice(e.getMessage()==null?"ثبت ناموفق بود":e.getMessage());}
     }));
@@ -437,6 +504,24 @@ public final class MainActivity extends Activity {
     clickRow(body,"حالت تاریک / روشن","هماهنگ با گوشی ("+(dark?"تاریک":"روشن")+")",
       ()->notice("حالت از تنظیمات گوشی خوانده می‌شود"));
     clickRow(body,"رنگ پوسته",ACCENT_NAMES[prefs.getInt("theme",0)],this::chooseTheme);
+    LinearLayout sizeCard=card();
+    TextView fontLabel=text("اندازه فونت: "+fontStep()+" از ۱۰ پله افزایش",14,true,fg);
+    sizeCard.addView(fontLabel);gap(sizeCard,7);
+    SeekBar fontSlider=new SeekBar(this);fontSlider.setMax(10);
+    fontSlider.setProgress(fontStep());sizeCard.addView(fontSlider,lp(-1,50));
+    TextView sample=text("پیش‌نمایش نوشته فارسی ۱۲۳٬۴۵۶",14,false,muted);
+    sizeCard.addView(sample);
+    fontSlider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){
+      public void onProgressChanged(SeekBar seek,int progress,boolean fromUser){
+        fontLabel.setText("اندازه فونت: "+progress+" از ۱۰ پله افزایش");
+        sample.setTextSize(14+progress);
+      }
+      public void onStartTrackingTouch(SeekBar seek){}
+      public void onStopTrackingTouch(SeekBar seek){
+        prefs.edit().putInt("fontStep",seek.getProgress()).apply();draw();
+      }
+    });
+    place(body,sizeCard,12);
     gap(body,12);title("پشتیبان‌گیری محلی");
     action(body,"↓ ذخیره بکاپ JSON",true,this::saveBackup);
     action(body,"↑ بازیابی بکاپ JSON",false,this::selectRestore);
@@ -497,7 +582,7 @@ public final class MainActivity extends Activity {
           output.write(block,0,n);
         }
         JSONObject json=new JSONObject(output.toString("UTF-8"));
-        if(!"DaftarNesieh".equals(json.optString("format"))||json.optInt("schemaVersion")!=1)
+        if(!"DaftarNesieh".equals(json.optString("format"))||(json.optInt("schemaVersion")!=1&&json.optInt("schemaVersion")!=2))
           throw new IllegalArgumentException("فرمت بکاپ معتبر نیست");
         new AlertDialog.Builder(this).setTitle("تأیید بازیابی")
           .setMessage("اطلاعات فعلی کاملاً جایگزین می‌شود. بهتر است ابتدا از داده‌های فعلی بکاپ بگیرید.")

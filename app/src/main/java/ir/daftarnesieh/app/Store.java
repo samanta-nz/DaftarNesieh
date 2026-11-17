@@ -14,7 +14,7 @@ import java.util.List;
 public final class Store extends SQLiteOpenHelper {
   public static final class Customer {
     public long id, balance;
-    public String first,last,phone;
+    public String first,last,phone,notes;
     public String name(){return first+" "+last;}
   }
   public static final class Movement {
@@ -28,30 +28,34 @@ public final class Store extends SQLiteOpenHelper {
     public LedgerLogic.Report report;
   }
   public static final class Stats {public long debts,receipts,collected,receivable;}
-  public Store(Context context){super(context,"daftar.db",null,1);}
+  public Store(Context context){super(context,"daftar.db",null,2);}
   @Override public void onConfigure(SQLiteDatabase db){db.setForeignKeyConstraintsEnabled(true);}
   @Override public void onCreate(SQLiteDatabase db){
-    db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT,first TEXT NOT NULL,last TEXT NOT NULL,phone TEXT NOT NULL,created_at INTEGER NOT NULL)");
+    db.execSQL("CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT,first TEXT NOT NULL,last TEXT NOT NULL,phone TEXT NOT NULL,notes TEXT NOT NULL DEFAULT '',created_at INTEGER NOT NULL)");
     db.execSQL("CREATE TABLE movements (id INTEGER PRIMARY KEY AUTOINCREMENT,customer_id INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,kind TEXT NOT NULL CHECK(kind IN ('DEBT','PAYMENT')),items TEXT NOT NULL DEFAULT '',method TEXT NOT NULL DEFAULT '',amount INTEGER NOT NULL CHECK(amount>0),timestamp INTEGER NOT NULL)");
     db.execSQL("CREATE INDEX idx_movements_customer_time ON movements(customer_id,timestamp,id)");
     db.execSQL("CREATE INDEX idx_movements_time ON movements(timestamp)");
   }
-  @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){throw new IllegalStateException("Migration required");}
+  @Override public void onUpgrade(SQLiteDatabase db,int oldVersion,int newVersion){
+    if(oldVersion==1 && newVersion==2)db.execSQL("ALTER TABLE customers ADD COLUMN notes TEXT NOT NULL DEFAULT ''");
+    else throw new IllegalStateException("Unknown migration "+oldVersion+" to "+newVersion);
+  }
   private static String clean(String text,int max){
     String s=text==null?"":text.trim();
     if(s.length()>max)throw new IllegalArgumentException("متن بیش از حد طولانی است");
     return s;
   }
-  public long addCustomer(String first,String last,String phone){
-    first=clean(first,80);last=clean(last,80);phone=clean(phone,25);
+  public long addCustomer(String first,String last,String phone,String notes){
+    first=clean(first,80);last=clean(last,80);phone=clean(phone,25);notes=clean(notes,800);
     if(first.isEmpty()||last.isEmpty())throw new IllegalArgumentException("نام و نام خانوادگی اجباری است");
     if(phone.replaceAll("[^0-9۰-۹٠-٩]","").length()<7)throw new IllegalArgumentException("شماره تماس معتبر وارد کنید");
     ContentValues v=new ContentValues();
-    v.put("first",first);v.put("last",last);v.put("phone",phone);v.put("created_at",System.currentTimeMillis());
+    v.put("first",first);v.put("last",last);v.put("phone",phone);v.put("notes",notes);v.put("created_at",System.currentTimeMillis());
     return getWritableDatabase().insertOrThrow("customers",null,v);
   }
-  public long addMovement(long customerId,String kind,String items,String method,long amount){
+  public long addMovement(long customerId,String kind,String items,String method,long amount,long timestamp){
     LedgerLogic.signed(kind,amount);
+    if(timestamp<=0)throw new IllegalArgumentException("تاریخ و ساعت نامعتبر است");
     items=clean(items,1000);method=clean(method,30);
     if(LedgerLogic.DEBT.equals(kind)&&items.isEmpty())throw new IllegalArgumentException("نام اجناس الزامی است");
     if(LedgerLogic.PAYMENT.equals(kind)&&
@@ -59,12 +63,12 @@ public final class Store extends SQLiteOpenHelper {
       throw new IllegalArgumentException("روش پرداخت نامعتبر است");
     ContentValues v=new ContentValues();
     v.put("customer_id",customerId);v.put("kind",kind);v.put("items",items);
-    v.put("method",method);v.put("amount",amount);v.put("timestamp",System.currentTimeMillis());
+    v.put("method",method);v.put("amount",amount);v.put("timestamp",timestamp);
     return getWritableDatabase().insertOrThrow("movements",null,v);
   }
   public List<Customer> customers(String search){
     List<Customer> out=new ArrayList<>();
-    String sql="SELECT c.id,c.first,c.last,c.phone,COALESCE(SUM(CASE WHEN m.kind='DEBT' THEN m.amount ELSE -m.amount END),0) balance "+
+    String sql="SELECT c.id,c.first,c.last,c.phone,c.notes,COALESCE(SUM(CASE WHEN m.kind='DEBT' THEN m.amount ELSE -m.amount END),0) balance "+
       "FROM customers c LEFT JOIN movements m ON m.customer_id=c.id";
     String[] args=null;
     if(search!=null&&!search.trim().isEmpty()){
@@ -76,17 +80,17 @@ public final class Store extends SQLiteOpenHelper {
     try(Cursor c=getReadableDatabase().rawQuery(sql,args)){
       while(c.moveToNext()){
         Customer x=new Customer();x.id=c.getLong(0);x.first=c.getString(1);
-        x.last=c.getString(2);x.phone=c.getString(3);x.balance=c.getLong(4);out.add(x);
+        x.last=c.getString(2);x.phone=c.getString(3);x.notes=c.getString(4);x.balance=c.getLong(5);out.add(x);
       }
     }
     return out;
   }
   public Customer customer(long id){
-    String sql="SELECT c.id,c.first,c.last,c.phone,COALESCE((SELECT SUM(CASE WHEN kind='DEBT' THEN amount ELSE -amount END) FROM movements WHERE customer_id=c.id),0) FROM customers c WHERE c.id=?";
+    String sql="SELECT c.id,c.first,c.last,c.phone,c.notes,COALESCE((SELECT SUM(CASE WHEN kind='DEBT' THEN amount ELSE -amount END) FROM movements WHERE customer_id=c.id),0) FROM customers c WHERE c.id=?";
     try(Cursor c=getReadableDatabase().rawQuery(sql,new String[]{String.valueOf(id)})){
       if(!c.moveToFirst())return null;
       Customer x=new Customer();x.id=c.getLong(0);x.first=c.getString(1);
-      x.last=c.getString(2);x.phone=c.getString(3);x.balance=c.getLong(4);return x;
+      x.last=c.getString(2);x.phone=c.getString(3);x.notes=c.getString(4);x.balance=c.getLong(5);return x;
     }
   }
   private static Movement movement(Cursor c){
@@ -134,13 +138,13 @@ public final class Store extends SQLiteOpenHelper {
     return s;
   }
   public JSONObject exportData(String shop,String occupation) throws Exception {
-    JSONObject j=new JSONObject();j.put("format","DaftarNesieh");j.put("schemaVersion",1);
+    JSONObject j=new JSONObject();j.put("format","DaftarNesieh");j.put("schemaVersion",2);
     j.put("exportedAt",System.currentTimeMillis());j.put("shopName",shop);j.put("occupation",occupation);
     JSONArray customers=new JSONArray(),movements=new JSONArray();
-    try(Cursor c=getReadableDatabase().rawQuery("SELECT id,first,last,phone,created_at FROM customers ORDER BY id",null)){
+    try(Cursor c=getReadableDatabase().rawQuery("SELECT id,first,last,phone,notes,created_at FROM customers ORDER BY id",null)){
       while(c.moveToNext()){
         JSONObject x=new JSONObject();x.put("id",c.getLong(0));x.put("first",c.getString(1));x.put("last",c.getString(2));
-        x.put("phone",c.getString(3));x.put("created_at",c.getLong(4));customers.put(x);
+        x.put("phone",c.getString(3));x.put("notes",c.getString(4));x.put("created_at",c.getLong(5));customers.put(x);
       }
     }
     try(Cursor c=getReadableDatabase().rawQuery("SELECT id,customer_id,kind,items,method,amount,timestamp FROM movements ORDER BY id",null)){
@@ -153,7 +157,7 @@ public final class Store extends SQLiteOpenHelper {
     j.put("customers",customers);j.put("movements",movements);return j;
   }
   public void restoreData(JSONObject backup) throws Exception {
-    if(!"DaftarNesieh".equals(backup.optString("format"))||backup.optInt("schemaVersion")!=1)
+    if(!"DaftarNesieh".equals(backup.optString("format"))||(backup.optInt("schemaVersion")!=1&&backup.optInt("schemaVersion")!=2))
       throw new IllegalArgumentException("فرمت فایل بکاپ نامعتبر است");
     JSONArray customers=backup.getJSONArray("customers"),movements=backup.getJSONArray("movements");
     if(customers.length()>100000||movements.length()>200000)throw new IllegalArgumentException("بکاپ بیش از حد بزرگ است");
@@ -166,10 +170,10 @@ public final class Store extends SQLiteOpenHelper {
         JSONObject x=customers.getJSONObject(i);
         long id=x.getLong("id"),created=x.getLong("created_at");
         if(id<=0||created<0)throw new IllegalArgumentException("شناسه مشتری نامعتبر");
-        String first=clean(x.getString("first"),80),last=clean(x.getString("last"),80),phone=clean(x.getString("phone"),25);
+        String first=clean(x.getString("first"),80),last=clean(x.getString("last"),80),phone=clean(x.getString("phone"),25),notes=clean(x.optString("notes",""),800);
         if(first.isEmpty()||last.isEmpty()||phone.isEmpty())throw new IllegalArgumentException("مشخصات مشتری ناقص است");
         ContentValues v=new ContentValues();v.put("id",id);v.put("first",first);v.put("last",last);
-        v.put("phone",phone);v.put("created_at",created);db.insertOrThrow("customers",null,v);
+        v.put("phone",phone);v.put("notes",notes);v.put("created_at",created);db.insertOrThrow("customers",null,v);
       }
       for(int i=0;i<movements.length();i++){
         JSONObject x=movements.getJSONObject(i);

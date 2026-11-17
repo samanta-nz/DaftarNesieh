@@ -8,23 +8,23 @@ public final class StatementSms {
     b.append("مشتری: ").append(s.customer.name()).append('\n');
     if(s.from==Long.MIN_VALUE) b.append("بازه: از ابتدا تا ").append(Shamsi.dateTime(Math.min(System.currentTimeMillis(),s.to-1))).append('\n');
     else b.append("بازه: ").append(Shamsi.day(s.from)).append(" تا ").append(Shamsi.day(s.to-1)).append('\n');
-    b.append("مانده قبلی: ").append(Money.balance(s.report.opening)).append('\n');
+    b.append("مانده قبلی: ").append(Money.balanceFull(s.report.opening)).append('\n');
     if(detailed){
       b.append("────────────").append('\n');
       long running=s.report.opening;
       for(Store.Movement e:s.movements){
         b.append(Shamsi.dateTime(e.timestamp)).append('\n');
         b.append(LedgerLogic.DEBT.equals(e.kind)?"نسیه: "+e.items:"پرداخت: "+e.method);
-        b.append(" | ").append(Money.format(e.amount)).append('\n');
+        b.append(" | ").append(Money.full(e.amount)).append('\n');
         running=LedgerLogic.sum(running,LedgerLogic.signed(e.kind,e.amount));
-        b.append("مانده: ").append(Money.balance(running)).append('\n');
+        b.append("مانده: ").append(Money.balanceFull(running)).append('\n');
       }
       if(s.movements.isEmpty()) b.append("گردشی در این بازه ثبت نشده است.\n");
       b.append("────────────").append('\n');
     }
-    b.append("نسیه جدید: ").append(Money.format(s.report.debt)).append('\n');
-    b.append("پرداخت‌ها: ").append(Money.format(s.report.receipts)).append('\n');
-    b.append("مانده پایان بازه: ").append(Money.balance(s.report.closing));
+    b.append("نسیه جدید: ").append(Money.full(s.report.debt)).append('\n');
+    b.append("پرداخت‌ها: ").append(Money.full(s.report.receipts)).append('\n');
+    b.append("مانده پایان بازه: ").append(Money.balanceFull(s.report.closing));
     return b.toString();
   }
 }
